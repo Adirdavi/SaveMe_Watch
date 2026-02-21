@@ -4,7 +4,7 @@ import Combine
 import HealthKit
 import CoreMotion
 import Network
-
+    //בדיקה
 // שימוש ב-REST API בלבד למניעת קריסות ב-watchOS
 class WatchManager: NSObject, ObservableObject, CMWaterSubmersionManagerDelegate {
 
@@ -72,7 +72,7 @@ class WatchManager: NSObject, ObservableObject, CMWaterSubmersionManagerDelegate
             }
         }.resume()
     }
-    
+        //בדיקה בדיקה
     func manager(_ manager: CMWaterSubmersionManager, didUpdate event: CMWaterSubmersionEvent) {
         DispatchQueue.main.async {
             self.isSubmerged = (event.state == .submerged)
