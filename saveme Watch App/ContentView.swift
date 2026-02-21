@@ -9,25 +9,31 @@ struct ContentView: View {
             // --- כפתור ענן בפינה השמאלית העליונה ---
             VStack {
                 HStack {
-                    Button(action: {
-                        // פעולה לשליחת הודעת בדיקה
-                        manager.sendTestMessage()
-                    }) {
-                        Image(systemName: "icloud.and.arrow.up")
-                            .font(.system(size: 20))
-                            .foregroundColor(.white) // שיניתי ללבן שיהיה בולט יותר על רקע שחור
+                    if manager.isSending {
+                        // מציג גלגל טעינה קטן במקום הכפתור בזמן "חשיבה"
+                        ProgressView()
+                            .frame(width: 40, height: 40)
+                    } else {
+                        Button(action: {
+                            // הפעלת שליחה ידנית עם מצב טעינה
+                            manager.manualUpload()
+                        }) {
+                            Image(systemName: "icloud.and.arrow.up")
+                                .font(.system(size: 20))
+                                .foregroundColor(.white)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .frame(width: 40, height: 40)
+                        .background(Color.gray.opacity(0.3))
+                        .clipShape(Circle())
                     }
-                    .buttonStyle(PlainButtonStyle())
-                    .frame(width: 40, height: 40) // קצת הגדלתי שיהיה קל ללחוץ
-                    .background(Color.gray.opacity(0.3)) // הוספתי רקע קטן לכפתור
-                    .clipShape(Circle())
                     
                     Spacer()
                 }
                 Spacer()
             }
             
-            // --- העיצוב המקורי שלך (במרכז) ---
+            // --- העיצוב המרכזי ---
             VStack {
                 // אייקון שמשתנה אם יש מים
                 Image(systemName: manager.isSubmerged ? "water.waves" : "heart.fill")
@@ -75,7 +81,24 @@ struct ContentView: View {
             }
         }
         .padding()
+        // --- הודעת קופצת (Alert) בסיום השליחה ---
+        .alert(item: Binding<AlertMessage?>(
+            get: { manager.alertMessage.map { AlertMessage(text: $0) } },
+            set: { _ in manager.alertMessage = nil }
+        )) { msg in
+            Alert(
+                title: Text("Firebase Status"),
+                message: Text(msg.text),
+                dismissButton: .default(Text("OK"))
+            )
+        }
     }
+}
+
+// עזר להצגת Alert עם טקסט משתנה
+struct AlertMessage: Identifiable {
+    let id = UUID()
+    let text: String
 }
 
 #Preview {
