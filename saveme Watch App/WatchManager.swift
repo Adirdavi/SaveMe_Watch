@@ -4,13 +4,14 @@ import Combine
 import HealthKit
 import CoreMotion
 import Network
+import WatchKit
 
 class WatchManager: NSObject, ObservableObject, CMWaterSubmersionManagerDelegate {
 
     // --- ניהול מצבי UI ---
     @Published var isSending: Bool = false
     @Published var alertMessage: String? = nil
-    @Published var isOnline: Bool = true // נשמר רק לאינדיקציה ויזואלית
+    @Published var isOnline: Bool = true
     
     // --- נתוני חיישנים ---
     @Published var heartRate: Double = 0
@@ -19,22 +20,30 @@ class WatchManager: NSObject, ObservableObject, CMWaterSubmersionManagerDelegate
     @Published var isSubmerged: Bool = false
     @Published var isMonitoring: Bool = false
     
+    // --- מזהה ייחודי של המכשיר להפרדה ב-Firebase ---
+    private let deviceID = WKInterfaceDevice.current().identifierForVendor?.uuidString ?? "unknown_device"
+    
     private let pathMonitor = NWPathMonitor()
     private let pathQueue = DispatchQueue(label: "net.path.monitor")
     private let healthStore = HKHealthStore()
     private let submersionManager = CMWaterSubmersionManager()
     
-    // --- Firebase REST URL ---
+    // ניהול ריצה ברקע
+    private var workoutSession: HKWorkoutSession?
+    private var workoutBuilder: HKLiveWorkoutBuilder?
+    
     private let databaseURL = "https://saveme-5666b-default-rtdb.europe-west1.firebasedatabase.app"
+    
+    // --- משתני עזר לניהול זמנים (טיימרים) ---
+    private var lastWarningTime: Date = Date.distantPast
+    private var lastSyncTime: Date = Date.distantPast // <--- השעון שסופר 5 שניות
     
     override init() {
         super.init()
 
         pathMonitor.pathUpdateHandler = { [weak self] path in
             DispatchQueue.main.async {
-                // מעדכן את הסטטוס אבל לא חוסם לוגיקה
                 self?.isOnline = (path.status == .satisfied)
-                print("Network status: \(path.status)")
             }
         }
         pathMonitor.start(queue: pathQueue)
@@ -48,9 +57,10 @@ class WatchManager: NSObject, ObservableObject, CMWaterSubmersionManagerDelegate
         pathMonitor.cancel()
     }
     
-    // --- פונקציית שליחה משופרת (ללא חסימת Offline) ---
+    // --- פונקציית שליחה מבוססת נתיב מכשיר ---
     private func sendToRestAPI(endpoint: String, data: [String: Any], isManual: Bool = false) {
-        guard let url = URL(string: "\(databaseURL)/\(endpoint).json") else { return }
+        let fullPath = "devices/\(deviceID)/\(endpoint)"
+        guard let url = URL(string: "\(databaseURL)/\(fullPath).json") else { return }
         
         if isManual {
             DispatchQueue.main.async {
@@ -62,57 +72,80 @@ class WatchManager: NSObject, ObservableObject, CMWaterSubmersionManagerDelegate
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        // Timeout של 15 שניות כדי לתת ל-Wi-Fi של השעון זמן להתעורר
         request.timeoutInterval = 15
         
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: data)
         } catch {
-            if isManual {
-                DispatchQueue.main.async {
-                    self.isSending = false
-                    self.alertMessage = "שגיאה בעיבוד הנתונים"
-                }
-            }
+            if isManual { DispatchQueue.main.async { self.isSending = false } }
             return
         }
         
         URLSession.shared.dataTask(with: request) { _, response, error in
             DispatchQueue.main.async {
-                if isManual { self.isSending = false }
-                
-                if let error = error {
-                    print("REST Error: \(error.localizedDescription)")
-                    if isManual {
-                        // אם יש שגיאה, נבדוק אם זה נראה כמו בעיית אינטרנט
-                        self.alertMessage = "שגיאת תקשורת. וודא שה-Wi-Fi בשעון דלוק."
-                    }
-                } else if let httpResponse = response as? HTTPURLResponse {
-                    if httpResponse.statusCode == 200 || httpResponse.statusCode == 201 {
-                        if isManual { self.alertMessage = "הנתונים נשמרו ב-Firebase!" }
+                if isManual {
+                    self.isSending = false
+                    if error == nil {
+                        self.alertMessage = "נשמר ב-Firebase תחת המכשיר שלך!"
                     } else {
-                        if isManual { self.alertMessage = "שגיאת שרת: \(httpResponse.statusCode)" }
+                        self.alertMessage = "שגיאת תקשורת"
                     }
                 }
             }
         }.resume()
     }
 
-    // --- כפתור הפעלה ידני ---
     func manualUpload() {
         let testData: [String: Any] = [
             "timestamp": Date().timeIntervalSince1970 * 1000,
             "heart_rate": self.heartRate > 0 ? self.heartRate : Double.random(in: 60...100),
             "depth": self.currentDepth,
-            "is_online_at_send": self.isOnline, // לדיבג: נראה מה הקוד חשב באותו רגע
             "type": "Manual_Sync"
         ]
         sendToRestAPI(endpoint: "manual_uploads", data: testData, isManual: true)
     }
 
-    // --- לוגיקה אוטומטית (נשארת ללא שינוי) ---
+    // --- מערכת התראות (מטריצת מדדים) ---
+    private func checkIfWarningNeeded() {
+        var hasIssue = false
+        var reason = ""
+
+        if heartRate > 155 {
+            hasIssue = true
+            reason = "CRITICAL_HIGH_HR"
+        } else if heartRate < 40 && heartRate > 0 {
+            hasIssue = true
+            reason = "CRITICAL_LOW_HR"
+        } else if currentDepth > 40 {
+            hasIssue = true
+            reason = "DEPTH_EXCEEDED"
+        }
+
+        if hasIssue && Date().timeIntervalSince(lastWarningTime) > 10 {
+            lastWarningTime = Date()
+            
+            let warningData: [String: Any] = [
+                "timestamp": Date().timeIntervalSince1970 * 1000,
+                "reason": reason,
+                "heart_rate": heartRate,
+                "depth": currentDepth
+            ]
+            
+            sendToRestAPI(endpoint: "active_warnings", data: warningData, isManual: false)
+            WKInterfaceDevice.current().play(.directionUp)
+        }
+    }
+
+    // --- עדכון שוטף לפיירבייס כל 5 שניות ---
     func sendDataToFirebase() {
+        let now = Date()
+        
+        // מוודא שעברו לפחות 5 שניות מאז הפעם האחרונה ששלחנו
+        guard now.timeIntervalSince(lastSyncTime) >= 5.0 else { return }
+        
+        // אם עברו 5 שניות, מעדכנים את זמן השליחה ושולחים
+        lastSyncTime = now
+        
         let alertData: [String: Any] = [
             "timestamp": Date().timeIntervalSince1970 * 1000,
             "heart_rate": self.heartRate,
@@ -120,16 +153,35 @@ class WatchManager: NSObject, ObservableObject, CMWaterSubmersionManagerDelegate
             "water_temp_celsius": self.waterTemp,
             "is_submerged": self.isSubmerged
         ]
+        
         sendToRestAPI(endpoint: "live_monitor", data: alertData, isManual: false)
+        checkIfWarningNeeded()
     }
 
-    // --- HealthKit & Submersion Delegates ---
+    // --- ניהול ריצה ברקע (Workout) ---
+    private func startBackgroundSession() {
+        let config = HKWorkoutConfiguration()
+        config.activityType = .other
+        config.locationType = .outdoor
+
+        do {
+            workoutSession = try HKWorkoutSession(healthStore: healthStore, configuration: config)
+            workoutBuilder = workoutSession?.associatedWorkoutBuilder()
+            workoutSession?.startActivity(with: Date())
+            workoutBuilder?.beginCollection(withStart: Date()) { _, _ in }
+        } catch {
+            print("Background session failed")
+        }
+    }
+
+    // --- Submersion Delegates ---
     func manager(_ manager: CMWaterSubmersionManager, didUpdate event: CMWaterSubmersionEvent) {
         DispatchQueue.main.async {
             self.isSubmerged = (event.state == .submerged)
             if event.state == .submerged {
+                self.startBackgroundSession()
                 self.startHeartRateQuery()
-                self.sendToRestAPI(endpoint: "emergency_alerts", data: ["status": "WATER_DETECTED"], isManual: false)
+                self.sendToRestAPI(endpoint: "events", data: ["status": "WATER_DETECTED"])
             }
         }
     }
@@ -138,7 +190,7 @@ class WatchManager: NSObject, ObservableObject, CMWaterSubmersionManagerDelegate
         DispatchQueue.main.async {
             if let depth = measurement.depth {
                 self.currentDepth = depth.value
-                self.sendDataToFirebase()
+                self.sendDataToFirebase() // יסונן על ידי מנגנון ה-5 שניות
             }
         }
     }
@@ -147,9 +199,12 @@ class WatchManager: NSObject, ObservableObject, CMWaterSubmersionManagerDelegate
         DispatchQueue.main.async { self.waterTemp = temperature.temperature.value }
     }
     
+    // --- HealthKit ---
     func requestAuthorization() {
         let heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate)!
-        healthStore.requestAuthorization(toShare: nil, read: [heartRateType]) { success, _ in
+        let workoutType = HKObjectType.workoutType()
+        
+        healthStore.requestAuthorization(toShare: [workoutType], read: [heartRateType]) { success, _ in
             if success { self.startHeartRateQuery() }
         }
     }
@@ -169,7 +224,7 @@ class WatchManager: NSObject, ObservableObject, CMWaterSubmersionManagerDelegate
         let hr = lastSample.quantity.doubleValue(for: HKUnit(from: "count/min"))
         DispatchQueue.main.async {
             self.heartRate = hr
-            self.sendDataToFirebase()
+            self.sendDataToFirebase() // יסונן על ידי מנגנון ה-5 שניות
         }
     }
 
