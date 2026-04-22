@@ -3,165 +3,218 @@ import SwiftUI
 import Combine
 import HealthKit
 import CoreMotion
-import Network
+import WatchKit
+import CoreLocation
 
-// שימוש ב-REST API בלבד למניעת קריסות ב-watchOS
 class WatchManager: NSObject, ObservableObject, CMWaterSubmersionManagerDelegate {
 
-    // --- בדיקת חיבור אינטרנט ---
-    private let pathMonitor = NWPathMonitor()
-    private let pathQueue = DispatchQueue(label: "net.path.monitor")
-    @Published private(set) var isOnline: Bool = true
+    // --- ניהול מצבי UI ---
+    @Published var isSending: Bool = false
+    @Published var alertMessage: String? = nil
+    @Published var isOnline: Bool = true
     
-    private let healthStore = HKHealthStore()
-    private let submersionManager = CMWaterSubmersionManager()
-    
-    // --- כתובת Firebase REST API ---
-    private let databaseURL = "https://saveme-5666b-default-rtdb.europe-west1.firebasedatabase.app"
-    
+    // --- נתוני חיישנים ומיקום ---
     @Published var heartRate: Double = 0
+    @Published var currentSpO2: Double = 98.0 // נתון חמצן בדם
     @Published var currentDepth: Double = 0
     @Published var waterTemp: Double = 0
     @Published var isSubmerged: Bool = false
     @Published var isMonitoring: Bool = false
+    @Published var currentLocation: CLLocationCoordinate2D?
+    
+    // --- שירותים חיצוניים (Services) ---
+    private let firebaseService = FirebaseService()
+    private let locationService = LocationService()
+    private let triageEngine = TriageEngine()
+    
+    private let healthStore = HKHealthStore()
+    private let submersionManager = CMWaterSubmersionManager()
+    
+    private var workoutSession: HKWorkoutSession?
+    private var workoutBuilder: HKLiveWorkoutBuilder?
+    private var lastSyncTime: Date = Date.distantPast
     
     override init() {
         super.init()
 
-        pathMonitor.pathUpdateHandler = { [weak self] path in
-            DispatchQueue.main.async {
-                self?.isOnline = (path.status == .satisfied)
-            }
+        // חיבור קלוז'רים (Callbacks) מהשירותים אל ה-UI
+        firebaseService.onNetworkUpdate = { [weak self] onlineStatus in
+            DispatchQueue.main.async { self?.isOnline = onlineStatus }
         }
-        pathMonitor.start(queue: pathQueue)
         
-        // אתחול חיישן המים אם זמין במכשיר
+        locationService.onLocationUpdate = { [weak self] coordinate in
+            DispatchQueue.main.async { self?.currentLocation = coordinate }
+        }
+        
         if CMWaterSubmersionManager.waterSubmersionAvailable {
             submersionManager.delegate = self
         }
     }
-
-    deinit {
-        pathMonitor.cancel()
-    }
     
-    // --- פונקציית שליחה לענן (REST) ---
-    private func sendToRestAPI(endpoint: String, data: [String: Any]) {
-        guard isOnline else {
-            print("No internet — skipping REST API request")
-            return
-        }
-        guard let url = URL(string: "\(databaseURL)/\(endpoint).json") else { return }
+    // --- פונקציית מעטפת לשליחה (הוסר ה-private כדי לאפשר גישה מה-UI) ---
+    func sendData(endpoint: String, data: [String: Any], isManual: Bool = false) {
+        if isManual { DispatchQueue.main.async { self.isSending = true; self.alertMessage = nil } }
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: data)
-        } catch {
-            print("JSON Error: \(error.localizedDescription)")
-            return
-        }
-        
-        URLSession.shared.dataTask(with: request) { _, response, error in
-            if let error = error {
-                print("REST Error: \(error.localizedDescription)")
-            } else if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
-                print("Success! Data sent to \(endpoint)")
+        firebaseService.send(endpoint: endpoint, data: data, isManual: isManual) { [weak self] success, message in
+            if isManual {
+                DispatchQueue.main.async {
+                    self?.isSending = false
+                    self?.alertMessage = message
+                }
             }
-        }.resume()
+        }
     }
-    
+
+    // --- עדכון שוטף לפיירבייס ---
+    func sendDataToFirebase() {
+        let now = Date()
+        // מגביל שליחה רגילה לכל 5 שניות
+        guard now.timeIntervalSince(lastSyncTime) >= 5.0 else { return }
+        lastSyncTime = now
+        
+        var alertData: [String: Any] = [
+            "timestamp": Date().timeIntervalSince1970 * 1000,
+            "heart_rate": self.heartRate,
+            "spo2": self.currentSpO2, // הוספת חמצן
+            "depth_meters": self.currentDepth,
+            "water_temp_celsius": self.waterTemp,
+            "is_submerged": self.isSubmerged
+        ]
+        
+        // הוספת מיקום אם קיים
+        if let loc = currentLocation {
+            alertData["latitude"] = loc.latitude
+            alertData["longitude"] = loc.longitude
+        }
+        
+        sendData(endpoint: "live_monitor", data: alertData, isManual: false)
+        
+        // --- בדיקת מערכת התראות דרך מנוע ה-Triage ---
+        if let alert = triageEngine.evaluate(currentHR: self.heartRate, currentSpO2: self.currentSpO2, currentDepth: self.currentDepth) {
+            var warningData: [String: Any] = [
+                "timestamp": Date().timeIntervalSince1970 * 1000,
+                "severity": alert.severity,
+                "reason": alert.reason,
+                "heart_rate": self.heartRate,
+                "spo2": self.currentSpO2,
+                "depth": self.currentDepth
+            ]
+            
+            if let loc = currentLocation {
+                warningData["latitude"] = loc.latitude
+                warningData["longitude"] = loc.longitude
+            }
+            
+            sendData(endpoint: "active_warnings", data: warningData, isManual: false)
+            
+            // רטט שונה לפי רמת סכנה
+            if alert.severity == "RED" {
+                WKInterfaceDevice.current().play(.failure) // רטט חזק לסכנת חיים
+            } else {
+                WKInterfaceDevice.current().play(.directionUp) // רטט קל לאזהרה
+            }
+        }
+    }
+
+    // --- HealthKit & Permissions ---
+    func requestAuthorization() {
+        locationService.requestPermission()
+        let heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate)!
+        let oxygenType = HKQuantityType.quantityType(forIdentifier: .oxygenSaturation)!
+        let workoutType = HKObjectType.workoutType()
+        
+        healthStore.requestAuthorization(toShare: [workoutType], read: [heartRateType, oxygenType]) { success, _ in
+            if success {
+                self.startHeartRateQuery()
+                self.startSpO2Query() // התחלת קריאת חמצן
+            }
+        }
+    }
+
+    // --- ניהול ריצה ברקע ו-GPS ---
+    private func startBackgroundSession() {
+        let config = HKWorkoutConfiguration()
+        config.activityType = .other
+        config.locationType = .outdoor
+
+        do {
+            workoutSession = try HKWorkoutSession(healthStore: healthStore, configuration: config)
+            workoutBuilder = workoutSession?.associatedWorkoutBuilder()
+            workoutSession?.startActivity(with: Date())
+            workoutBuilder?.beginCollection(withStart: Date()) { _, _ in }
+            
+            locationService.start() // הפעלת GPS
+        } catch {
+            print("Background session failed")
+        }
+    }
+
+    // --- Submersion Delegates ---
     func manager(_ manager: CMWaterSubmersionManager, didUpdate event: CMWaterSubmersionEvent) {
         DispatchQueue.main.async {
             self.isSubmerged = (event.state == .submerged)
-            
-            // ברגע זיהוי מים - "מעירים" את המערכת
             if event.state == .submerged {
-                print("Emergency: Water detected! Auto-starting monitoring...")
-                
-                // 1. הפעלת קריאת דופק אוטומטית
+                self.startBackgroundSession()
                 self.startHeartRateQuery()
-                
-                // 2. שליחת התראה מיידית לנתיב חירום
-                let emergencyData: [String: Any] = [
-                    "status": "WATER_ENTRY_DETECTED",
-                    "timestamp": Date().timeIntervalSince1970 * 1000
-                ]
-                self.sendToRestAPI(endpoint: "emergency_alerts", data: emergencyData)
+                self.startSpO2Query()
+                self.sendData(endpoint: "events", data: ["status": "WATER_DETECTED"])
+            } else {
+                self.locationService.stop() // חוסך סוללה כשיצאו מהמים
             }
         }
     }
     
-    // --- עדכון עומק וטמפרטורה ---
     func manager(_ manager: CMWaterSubmersionManager, didUpdate measurement: CMWaterSubmersionMeasurement) {
         DispatchQueue.main.async {
             if let depth = measurement.depth {
                 self.currentDepth = depth.value
-                self.sendDataToFirebase() // עדכון בזמן אמת על עומק הצלילה
+                self.sendDataToFirebase()
             }
         }
     }
     
     func manager(_ manager: CMWaterSubmersionManager, didUpdate temperature: CMWaterTemperature) {
-        DispatchQueue.main.async {
-            self.waterTemp = temperature.temperature.value
-        }
+        DispatchQueue.main.async { self.waterTemp = temperature.temperature.value }
     }
     
-    func requestAuthorization() {
-        let heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate)!
-        let typesToRead: Set = [heartRateType]
-        healthStore.requestAuthorization(toShare: nil, read: typesToRead) { success, _ in
-            if success { self.startHeartRateQuery() }
-        }
-    }
-    
+    // --- שאילתות חיישנים (דופק וחמצן) ---
     func startHeartRateQuery() {
         guard let sampleType = HKObjectType.quantityType(forIdentifier: .heartRate) else { return }
         DispatchQueue.main.async { self.isMonitoring = true }
-
         let query = HKAnchoredObjectQuery(type: sampleType, predicate: nil, anchor: nil, limit: HKObjectQueryNoLimit) { _, samples, _, _, _ in
-            self.processSamples(samples)
+            self.processHRSamples(samples)
         }
-        query.updateHandler = { _, samples, _, _, _ in
-            self.processSamples(samples)
-        }
+        query.updateHandler = { _, samples, _, _, _ in self.processHRSamples(samples) }
         healthStore.execute(query)
     }
     
-    private func processSamples(_ samples: [HKSample]?) {
+    private func processHRSamples(_ samples: [HKSample]?) {
         guard let samples = samples as? [HKQuantitySample], let lastSample = samples.last else { return }
-        let newHeartRate = lastSample.quantity.doubleValue(for: HKUnit(from: "count/min"))
-        
+        let hr = lastSample.quantity.doubleValue(for: HKUnit(from: "count/min"))
         DispatchQueue.main.async {
-            self.heartRate = newHeartRate
+            self.heartRate = hr
             self.sendDataToFirebase()
         }
     }
     
-    func sendDataToFirebase() {
-        let alertData: [String: Any] = [
-            "timestamp": Date().timeIntervalSince1970 * 1000,
-            "heart_rate": self.heartRate,
-            "depth_meters": self.currentDepth,
-            "water_temp_celsius": self.waterTemp,
-            "is_submerged": self.isSubmerged
-        ]
-        sendToRestAPI(endpoint: "live_monitor", data: alertData)
-    }
-
-    func manager(_ manager: CMWaterSubmersionManager, errorOccurred error: Error) {
-        print("Submersion Error: \(error.localizedDescription)")
+    func startSpO2Query() {
+        guard let sampleType = HKObjectType.quantityType(forIdentifier: .oxygenSaturation) else { return }
+        let query = HKAnchoredObjectQuery(type: sampleType, predicate: nil, anchor: nil, limit: HKObjectQueryNoLimit) { _, samples, _, _, _ in
+            self.processSpO2Samples(samples)
+        }
+        query.updateHandler = { _, samples, _, _, _ in self.processSpO2Samples(samples) }
+        healthStore.execute(query)
     }
     
-    func sendTestMessage() {
-        let testData: [String: Any] = [
-            "timestamp": Date().timeIntervalSince1970 * 1000,
-            "message": "Manual Test",
-            "heart_rate": Int.random(in: 60...100)
-        ]
-        sendToRestAPI(endpoint: "test_connection", data: testData)
+    private func processSpO2Samples(_ samples: [HKSample]?) {
+        guard let samples = samples as? [HKQuantitySample], let lastSample = samples.last else { return }
+        // HealthKit מחזיר סטורציה כשבר עשרוני (למשל 0.98), נכפיל ב-100 כדי שיהיה באחוזים
+        let spo2 = lastSample.quantity.doubleValue(for: HKUnit.percent()) * 100.0
+        DispatchQueue.main.async {
+            self.currentSpO2 = spo2
+            self.sendDataToFirebase()
+        }
     }
+
+    func manager(_ manager: CMWaterSubmersionManager, errorOccurred error: Error) { print(error.localizedDescription) }
 }
