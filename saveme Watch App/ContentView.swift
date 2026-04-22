@@ -1,53 +1,65 @@
 import SwiftUI
 
 struct ContentView: View {
-    // יוצר חיבור למנהל השעון
+    // יוצר חיבור למנהל השעון הראשי שמנצח על הכל
     @StateObject var manager = WatchManager()
     
     var body: some View {
         ZStack {
-            // --- כפתור ענן בפינה השמאלית העליונה ---
+            // --- אזור עליון - כפתור ענן בלבד ---
             VStack {
                 HStack {
+                    Spacer() // דוחף את כפתור הענן ימינה בצורה נקייה
+                    
+                    // כפתור ענן לשליחת ניסיון יזומה
                     if manager.isSending {
-                        // מציג גלגל טעינה קטן במקום הכפתור בזמן "חשיבה"
-                        ProgressView()
-                            .frame(width: 40, height: 40)
+                        ProgressView().frame(width: 30, height: 30)
                     } else {
                         Button(action: {
-                            // הפעלת שליחה ידנית עם מצב טעינה
-                            manager.manualUpload()
+                            // שימוש בפונקציית מעטפת שיצרנו ב-WatchManager
+                            manager.sendData(endpoint: "events", data: ["status": "MANUAL_TEST"], isManual: true)
                         }) {
                             Image(systemName: "icloud.and.arrow.up")
-                                .font(.system(size: 20))
+                                .font(.system(size: 16))
                                 .foregroundColor(.white)
                         }
                         .buttonStyle(PlainButtonStyle())
-                        .frame(width: 40, height: 40)
-                        .background(Color.gray.opacity(0.3))
+                        .frame(width: 30, height: 30)
+                        .background(Color.gray.opacity(0.4))
                         .clipShape(Circle())
                     }
-                    
-                    Spacer()
                 }
                 Spacer()
             }
+            .padding(.top, 5)
             
-            // --- העיצוב המרכזי ---
-            VStack {
-                // אייקון שמשתנה אם יש מים
-                Image(systemName: manager.isSubmerged ? "water.waves" : "heart.fill")
-                    .font(.system(size: 40))
-                    .foregroundColor(manager.isSubmerged ? .blue : .red)
-                    .padding(.bottom, 5)
+            // --- העיצוב המרכזי - נתוני רפואה וצלילה ---
+            VStack(spacing: 6) {
                 
-                // נתונים ראשיים
-                VStack(spacing: 8) {
-                    Text("\(Int(manager.heartRate)) BPM")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.red)
+                // אייקון סטטוס מצב מים (כחול למים, אדום ליבשה)
+                Image(systemName: manager.isSubmerged ? "water.waves" : "heart.text.square.fill")
+                    .font(.system(size: 32))
+                    .foregroundColor(manager.isSubmerged ? .blue : .red)
+                
+                // נתוני לב וחמצן
+                HStack {
+                    VStack {
+                        Text("\(Int(manager.heartRate))")
+                            .font(.title2).fontWeight(.bold).foregroundColor(.red)
+                        Text("BPM").font(.caption2).foregroundColor(.gray)
+                    }
                     
+                    Text("|").foregroundColor(.gray).font(.title3)
+                    
+                    VStack {
+                        Text("\(Int(manager.currentSpO2))%")
+                            .font(.title2).fontWeight(.bold).foregroundColor(.cyan)
+                        Text("SpO2").font(.caption2).foregroundColor(.gray)
+                    }
+                }
+                
+                // נתוני צלילה (מוצגים רק אם במים, או אם יש נתונים)
+                if manager.currentDepth > 0 || manager.isSubmerged {
                     HStack {
                         Text(String(format: "%.1fm", manager.currentDepth))
                             .foregroundColor(.blue)
@@ -55,39 +67,51 @@ struct ContentView: View {
                         Text(String(format: "%.1f°C", manager.waterTemp))
                             .foregroundColor(.orange)
                     }
-                    .font(.headline)
+                    .font(.subheadline)
+                    .padding(.top, 2)
                 }
-                .padding()
                 
-                // כפתור התחלה או סטטוס
+                Spacer().frame(height: 10)
+                
+                // כפתורי הפעלה / סטטוס
                 if !manager.isMonitoring {
                     Button(action: {
                         manager.requestAuthorization()
                     }) {
-                        Text("Start Monitor")
-                            .font(.system(size: 14))
+                        Text("Start Sensors")
+                            .font(.system(size: 14, weight: .bold))
                             .foregroundColor(.black)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
                     }
                     .background(Color.yellow)
-                    .cornerRadius(20)
+                    .cornerRadius(15)
                 } else {
-                    Text(manager.isSubmerged ? "UNDERWATER ACTIVE" : "Monitoring...")
-                        .font(.caption)
-                        .foregroundColor(manager.isSubmerged ? .cyan : .green)
-                        .padding(.top, 5)
+                    // סטטוס מערכת
+                    VStack(spacing: 2) {
+                        Text(manager.isSubmerged ? "DIVE DETECTED" : "Sensors Active")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(manager.isSubmerged ? .blue : .green)
+                        
+                        // חיווי קליטת GPS
+                        HStack {
+                            Image(systemName: manager.currentLocation != nil ? "location.fill" : "location.slash")
+                            Text(manager.currentLocation != nil ? "GPS Locked" : "Searching GPS")
+                        }
+                        .font(.system(size: 10))
+                        .foregroundColor(manager.currentLocation != nil ? .green : .gray)
+                    }
                 }
             }
+            .padding(.top, 20)
         }
-        .padding()
+        .padding(8)
+        
         // --- הודעת קופצת (Alert) בסיום השליחה ---
         .alert(item: Binding<AlertMessage?>(
             get: { manager.alertMessage.map { AlertMessage(text: $0) } },
             set: { _ in manager.alertMessage = nil }
         )) { msg in
             Alert(
-                title: Text("Firebase Status"),
+                title: Text("System Status"),
                 message: Text(msg.text),
                 dismissButton: .default(Text("OK"))
             )

@@ -355,6 +355,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Monitoring heart rate for safety";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Saving health data";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "We need your location to send coordinates to rescue services in case of an emergency.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "Monitoring underwater depth and movement";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.ya.save.me;
@@ -397,6 +398,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Monitoring heart rate for safety";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Saving health data";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "We need your location to send coordinates to rescue services in case of an emergency.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "Monitoring underwater depth and movement";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.ya.save.me;
