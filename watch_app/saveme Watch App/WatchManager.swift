@@ -75,10 +75,25 @@ class WatchManager: NSObject, ObservableObject, CMWaterSubmersionManagerDelegate
         guard now.timeIntervalSince(lastSyncTime) >= 5.0 else { return }
         lastSyncTime = now
         
-        let effectiveHR = isDemoMode ? 160.0 : self.heartRate
-        let effectiveSpO2 = isDemoMode ? 85.0 : self.currentSpO2
-        let effectiveDepth = isDemoMode ? 5.0 : self.currentDepth
-        let effectiveSubmerged = isDemoMode ? true : self.isSubmerged
+        var effectiveHR = self.heartRate
+        var effectiveSpO2 = self.currentSpO2
+        var effectiveDepth = self.currentDepth
+        var effectiveSubmerged = self.isSubmerged
+        
+        if isDemoMode {
+            effectiveSubmerged = true
+            // מחליף מצב כל 15 שניות בין צהוב לאדום
+            let isYellowPhase = (Int(now.timeIntervalSince1970) / 15) % 2 == 0
+            if isYellowPhase {
+                effectiveHR = 145.0   // דגל צהוב
+                effectiveSpO2 = 92.0  // דגל צהוב
+                effectiveDepth = 0.5
+            } else {
+                effectiveHR = 160.0   // דגל אדום
+                effectiveSpO2 = 85.0  // דגל אדום
+                effectiveDepth = 5.0  // דגל אדום
+            }
+        }
         
         var alertData: [String: Any] = [
             "timestamp": now.timeIntervalSince1970 * 1000,
