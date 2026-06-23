@@ -93,30 +93,6 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		6BBDACB32F2F92BE005A3FE5 /* saveme */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 6BBDACD22F2F92C1005A3FE5 /* Build configuration list for PBXNativeTarget "saveme" */;
-			buildPhases = (
-				6BBDACB02F2F92BE005A3FE5 /* Sources */,
-				6BBDACB12F2F92BE005A3FE5 /* Frameworks */,
-				6BBDACB22F2F92BE005A3FE5 /* Resources */,
-				6BBDACD12F2F92C1005A3FE5 /* Embed Watch Content */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				6BBDACC42F2F92C0005A3FE5 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				6BBDACB62F2F92BE005A3FE5 /* saveme */,
-			);
-			name = saveme;
-			packageProductDependencies = (
-			);
-			productName = saveme;
-			productReference = 6BBDACB42F2F92BE005A3FE5 /* saveme.app */;
-			productType = "com.apple.product-type.application";
-		};
 		6BBDACC02F2F92C0005A3FE5 /* saveme Watch App */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 6BBDACCE2F2F92C1005A3FE5 /* Build configuration list for PBXNativeTarget "saveme Watch App" */;
@@ -175,7 +151,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				6BBDACB32F2F92BE005A3FE5 /* saveme */,
+				6BBDACB32F2F92BE005A3FE5,
 				6BBDACC02F2F92C0005A3FE5 /* saveme Watch App */,
 			);
 		};
@@ -517,7 +493,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		6BBDACD22F2F92C1005A3FE5 /* Build configuration list for PBXNativeTarget "saveme" */ = {
+		6BBDACD22F2F92C1005A3FE5 = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				6BBDACD32F2F92C1005A3FE5 /* Debug */,
