@@ -16,7 +16,7 @@ class FirebaseService {
     private let pathMonitor = NWPathMonitor()
     private let pathQueue = DispatchQueue(label: "net.path.monitor")
     
-    // קלוז'ר (Callback) לעדכון הסטטוס ב-UI
+    // Callback to update the UI status
     var onNetworkUpdate: ((Bool) -> Void)?
 
     init() {
@@ -35,22 +35,30 @@ class FirebaseService {
         guard let url = URL(string: "\(databaseURL)/\(fullPath).json") else { return }
 
         var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        
+        // Use PUT for live_monitor and active_warnings to overwrite and keep only the latest state
+        // Use POST for events to maintain a history log
+        if endpoint == "live_monitor" || endpoint == "active_warnings" {
+            request.httpMethod = "PUT"
+        } else {
+            request.httpMethod = "POST"
+        }
+        
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 15
 
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: data)
         } catch {
-            completion(false, "שגיאת קידוד נתונים")
+            completion(false, "Data encoding error")
             return
         }
 
         URLSession.shared.dataTask(with: request) { _, _, error in
             if error != nil {
-                completion(false, "שגיאת תקשורת")
+                completion(false, "Network error")
             } else {
-                completion(true, "נשמר ב-Firebase!")
+                completion(true, "Saved to Firebase!")
             }
         }.resume()
     }

@@ -16,10 +16,12 @@ class LocationService: NSObject, CLLocationManagerDelegate {
     override init() {
         super.init()
         locationManager.delegate = self
-        // שימוש ברמת הדיוק הגבוהה ביותר (קריטי לחילוץ)
-        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+
+        // Maximum Waze-level accuracy
+        locationManager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
+        locationManager.distanceFilter = kCLDistanceFilterNone
+        locationManager.activityType = .fitness
         
-        // הגדרה קריטית לשעון: מאפשר ל-GPS להמשיך לעבוד גם כשהמסך נכבה / רץ ברקע
         locationManager.allowsBackgroundLocationUpdates = true
     }
 
@@ -28,7 +30,6 @@ class LocationService: NSObject, CLLocationManagerDelegate {
     }
 
     func start() {
-        // בודק מראש האם יש הרשאה, ורק אז מפעיל
         let status = locationManager.authorizationStatus
         if status == .authorizedWhenInUse || status == .authorizedAlways {
             locationManager.startUpdatingLocation()
@@ -39,8 +40,6 @@ class LocationService: NSObject, CLLocationManagerDelegate {
         locationManager.stopUpdatingLocation()
     }
 
-    // --- פונקציית הקסם שהייתה חסרה ---
-    // אפל קוראת לפונקציה הזו אוטומטית ברגע שהסטטוס משתנה (למשל, כשהמשתמש לוחץ "אשר")
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         let status = manager.authorizationStatus
         if status == .authorizedWhenInUse || status == .authorizedAlways {
@@ -51,13 +50,11 @@ class LocationService: NSObject, CLLocationManagerDelegate {
         }
     }
 
-    // --- קבלת הנתונים בפועל ---
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
         onLocationUpdate?(location.coordinate)
     }
     
-    // פונקציה שעוזרת לנו לדבג - אם ה-GPS קורס, זה ידפיס לנו למה
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         print("GPS Error: \(error.localizedDescription)")
     }
