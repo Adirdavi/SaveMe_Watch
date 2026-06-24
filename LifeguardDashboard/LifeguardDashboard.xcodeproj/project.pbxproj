@@ -18,6 +18,11 @@
 		B90DA08E2FB710EC006B5C2A /* MainSplitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90DA0822FB710EC006B5C2A /* MainSplitView.swift */; };
 		B90DA0922FB716B4006B5C2A /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = B90DA0912FB716B4006B5C2A /* FirebaseCore */; };
 		B90DA0942FB716B4006B5C2A /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = B90DA0932FB716B4006B5C2A /* FirebaseDatabase */; };
+		B90DA0962FB716B4006B5C2A /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = B90DA0952FB716B4006B5C2A /* FirebaseAuth */; };
+		B90DA0B02FB710EC006B5C2A /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90DA0A02FB710EC006B5C2A /* UserProfile.swift */; };
+		B90DA0B32FB710EC006B5C2A /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90DA0A32FB710EC006B5C2A /* AppState.swift */; };
+		B90DA0B42FB710EC006B5C2A /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90DA0A42FB710EC006B5C2A /* AuthView.swift */; };
+		B90DA0B52FB710EC006B5C2A /* RootContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90DA0A52FB710EC006B5C2A /* RootContentView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -50,6 +55,10 @@
 		B90DA0822FB710EC006B5C2A /* MainSplitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainSplitView.swift; sourceTree = "<group>"; };
 		B90DA0832FB710EC006B5C2A /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
 		B90DA0842FB710EC006B5C2A /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
+		B90DA0A02FB710EC006B5C2A /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
+		B90DA0A32FB710EC006B5C2A /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		B90DA0A42FB710EC006B5C2A /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
+		B90DA0A52FB710EC006B5C2A /* RootContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootContentView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -77,6 +86,7 @@
 			files = (
 				B90DA0942FB716B4006B5C2A /* FirebaseDatabase in Frameworks */,
 				B90DA0922FB716B4006B5C2A /* FirebaseCore in Frameworks */,
+				B90DA0962FB716B4006B5C2A /* FirebaseAuth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -127,6 +137,7 @@
 			isa = PBXGroup;
 			children = (
 				B90DA07A2FB710EC006B5C2A /* Swimmer.swift */,
+				B90DA0A02FB710EC006B5C2A /* UserProfile.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -144,6 +155,7 @@
 			isa = PBXGroup;
 			children = (
 				B90DA07F2FB710EC006B5C2A /* SwimmerViewModel.swift */,
+				B90DA0A32FB710EC006B5C2A /* AppState.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -155,6 +167,8 @@
 				B90DA0822FB710EC006B5C2A /* MainSplitView.swift */,
 				B90DA0832FB710EC006B5C2A /* MapView.swift */,
 				B90DA0842FB710EC006B5C2A /* SidebarView.swift */,
+				B90DA0A42FB710EC006B5C2A /* AuthView.swift */,
+				B90DA0A52FB710EC006B5C2A /* RootContentView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -188,6 +202,7 @@
 			packageProductDependencies = (
 				B90DA0912FB716B4006B5C2A /* FirebaseCore */,
 				B90DA0932FB716B4006B5C2A /* FirebaseDatabase */,
+				B90DA0952FB716B4006B5C2A /* FirebaseAuth */,
 			);
 			productName = LifeguardDashboard;
 			productReference = B90DA04F2FB70DEA006B5C2A /* LifeguardDashboard.app */;
@@ -324,6 +339,10 @@
 				B90DA08C2FB710EC006B5C2A /* FirebaseManager.swift in Sources */,
 				B90DA08D2FB710EC006B5C2A /* HealthBubbleView.swift in Sources */,
 				B90DA08E2FB710EC006B5C2A /* MainSplitView.swift in Sources */,
+				B90DA0B02FB710EC006B5C2A /* UserProfile.swift in Sources */,
+				B90DA0B32FB710EC006B5C2A /* AppState.swift in Sources */,
+				B90DA0B42FB710EC006B5C2A /* AuthView.swift in Sources */,
+				B90DA0B52FB710EC006B5C2A /* RootContentView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -409,7 +428,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -466,7 +485,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -486,17 +505,19 @@
 				DEVELOPMENT_TEAM = S7H86Q7J53;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "We need your location to find the closest lifeguard station.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ya.save.me.watchkitapp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ya.save.me.dashboard;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -518,11 +539,13 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "We need your location to find the closest lifeguard station.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -548,7 +571,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ya.save.me.watchkitapp.LifeguardDashboardTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -569,7 +592,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ya.save.me.watchkitapp.LifeguardDashboardTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -683,6 +706,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B90DA08F2FB71677006B5C2A /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseDatabase;
+		};
+		B90DA0952FB716B4006B5C2A /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B90DA08F2FB71677006B5C2A /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
