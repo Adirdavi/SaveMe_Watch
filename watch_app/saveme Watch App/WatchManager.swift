@@ -69,6 +69,10 @@ class WatchManager: NSObject, ObservableObject, CMWaterSubmersionManagerDelegate
             }
         }
     }
+    
+    func saveProfile(name: String, age: Int, height: Double, weight: Double, gender: String) {
+        firebaseService.updateUserProfile(name: name, age: age, height: height, weight: weight, gender: gender)
+    }
 
     func sendDataToFirebase() {
         let now = Date()

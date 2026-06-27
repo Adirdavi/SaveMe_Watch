@@ -11,7 +11,14 @@ import WatchKit
 
 class FirebaseService {
     private let databaseURL = "https://saveme-5666b-default-rtdb.europe-west1.firebasedatabase.app"
-    private let deviceID = WKInterfaceDevice.current().identifierForVendor?.uuidString ?? "unknown_device"
+    
+    private var deviceID: String {
+        let name = UserDefaults.standard.string(forKey: "userName") ?? ""
+        if !name.isEmpty {
+            return name
+        }
+        return WKInterfaceDevice.current().identifierForVendor?.uuidString ?? "unknown_device"
+    }
     
     private let pathMonitor = NWPathMonitor()
     private let pathQueue = DispatchQueue(label: "net.path.monitor")
@@ -61,5 +68,29 @@ class FirebaseService {
                 completion(true, "Saved to Firebase!")
             }
         }.resume()
+    }
+
+    func updateUserProfile(name: String, age: Int, height: Double, weight: Double, gender: String) {
+        let fullPath = "devices/\(deviceID)/profile"
+        guard let url = URL(string: "\(databaseURL)/\(fullPath).json") else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let data: [String: Any] = [
+            "age": age,
+            "height": height,
+            "weight": weight,
+            "gender": gender
+        ]
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: data)
+        } catch {
+            return
+        }
+
+        URLSession.shared.dataTask(with: request).resume()
     }
 }

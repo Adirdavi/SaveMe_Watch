@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ContentView: View {
     @AppStorage("isProfileComplete") var isProfileComplete: Bool = false
+    @AppStorage("userName") var userName: String = ""
+    @AppStorage("userGender") var userGender: String = "Male"
     @AppStorage("userAge") var userAge: Int = 25
     @AppStorage("userHeight") var userHeight: Double = 1.80
     @AppStorage("userWeight") var userWeight: Double = 75.0
@@ -23,6 +25,14 @@ struct ContentView: View {
         Form {
             Section(header: Text("Personalize SaveMe").font(.system(size: 13, weight: .bold))) {
                 
+                TextField("Name", text: $userName)
+                
+                Picker("Gender", selection: $userGender) {
+                    Text("Male").tag("Male")
+                    Text("Female").tag("Female")
+                    Text("Other").tag("Other")
+                }
+                
                 // Picker פותח אוטומטית את מסך הגלילה (הגלגל) של אפל
                 Picker("Age", selection: $userAge) {
                     ForEach(10...100, id: \.self) { age in
@@ -43,6 +53,7 @@ struct ContentView: View {
                 }
                 
                 Button(action: {
+                    manager.saveProfile(name: userName, age: userAge, height: userHeight, weight: userWeight, gender: userGender)
                     withAnimation {
                         isProfileComplete = true
                     }
