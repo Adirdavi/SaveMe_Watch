@@ -1,8 +1,11 @@
 import SwiftUI
 
 struct AlertCard: View {
+    enum Severity {
+        case red, yellow, green, outOfWater
+    }
     let title: String
-    let severity: SwimmerFilterType // .red, .yellow, .green, or .outOfWater
+    let severity: Severity
     let iconName: String
     
     var body: some View {

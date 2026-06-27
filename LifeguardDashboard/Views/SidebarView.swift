@@ -5,8 +5,6 @@ struct SidebarView: View {
     @EnvironmentObject var appState: AppState
     @ObservedObject var viewModel: SwimmerViewModel
     
-    @State private var selectedSwimmer: Swimmer? = nil
-    @State private var showResolutionDialog = false
     @State private var showEditProfile = false
     
     var body: some View {
@@ -74,289 +72,260 @@ struct SidebarView: View {
                         .padding(.horizontal)
                 }
 
-
-                
-                // Section 2: Alerts Panel (matching reference photo style)
+                // Section: Operational Zones Grouping (replacing Health Alerts)
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Alerts")
+                    Text("Zones")
                         .font(.system(size: 26, weight: .bold))
                         .foregroundColor(.primary)
                         .padding(.horizontal)
                     
                     VStack(spacing: 12) {
-                        // 1. High Surf Warning (Red)
-                        VStack(alignment: .leading, spacing: 8) {
-                            AlertCard(
-                                title: "Red Flag - In Danger",
-                                severity: .red,
-                                iconName: "flag.fill"
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(viewModel.activeFilter == .red ? Color.red : Color.clear, lineWidth: 2.5)
-                            )
-                            .onTapGesture {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                                    if viewModel.activeFilter == .red {
-                                        viewModel.activeFilter = nil
-                                    } else {
-                                        viewModel.activeFilter = .red
-                                    }
-                                }
-                            }
-                            
-                            if viewModel.activeFilter == .red {
-                                let redSwimmers = viewModel.sortedSwimmers.filter { $0.flagStatus == .redFlag }
-                                VStack(alignment: .leading, spacing: 8) {
-                                    if redSwimmers.isEmpty {
-                                        Text("No swimmers in this category")
-                                            .font(.system(size: 13, weight: .medium))
-                                            .foregroundColor(.secondary)
-                                            .padding(.horizontal)
-                                            .padding(.vertical, 4)
-                                    } else {
-                                         ForEach(redSwimmers) { swimmer in
-                                             SwimmerRowView(swimmer: swimmer, viewModel: viewModel) { swimmer in
-                                                 self.selectedSwimmer = swimmer
-                                                 self.showResolutionDialog = true
-                                             }
-                                         }
-                                    }
-                                }
-                                .transition(.opacity.combined(with: .move(edge: .top)))
-                                .padding(.vertical, 4)
-                            }
-                        }
+                        // 1. Deep Water Zone (Red indicator)
+                        zoneSection(title: "Deep Water Zone", zone: .deepWater)
                         
-                        // 2. Rip Current Advisory (Yellow)
-                        VStack(alignment: .leading, spacing: 8) {
-                            AlertCard(
-                                title: "Yellow Flag - Caution",
-                                severity: .yellow,
-                                iconName: "flag.fill"
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(viewModel.activeFilter == .yellow ? Color.orange : Color.clear, lineWidth: 2.5)
-                            )
-                            .onTapGesture {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                                    if viewModel.activeFilter == .yellow {
-                                        viewModel.activeFilter = nil
-                                    } else {
-                                        viewModel.activeFilter = .yellow
-                                    }
-                                }
-                            }
-                            
-                            if viewModel.activeFilter == .yellow {
-                                let yellowSwimmers = viewModel.sortedSwimmers.filter { $0.flagStatus == .yellowFlag }
-                                VStack(alignment: .leading, spacing: 8) {
-                                    if yellowSwimmers.isEmpty {
-                                        Text("No swimmers in this category")
-                                            .font(.system(size: 13, weight: .medium))
-                                            .foregroundColor(.secondary)
-                                            .padding(.horizontal)
-                                            .padding(.vertical, 4)
-                                    } else {
-                                         ForEach(yellowSwimmers) { swimmer in
-                                             SwimmerRowView(swimmer: swimmer, viewModel: viewModel) { swimmer in
-                                                 self.selectedSwimmer = swimmer
-                                                 self.showResolutionDialog = true
-                                             }
-                                         }
-                                    }
-                                }
-                                .transition(.opacity.combined(with: .move(edge: .top)))
-                                .padding(.vertical, 4)
-                            }
-                        }
+                        // 2. Shallows Zone (Yellow indicator)
+                        zoneSection(title: "Shallows Zone", zone: .shallows)
                         
-                        // 3. Water Quality Good (Green)
-                        VStack(alignment: .leading, spacing: 8) {
-                            AlertCard(
-                                title: "Green Flag - Safe",
-                                severity: .green,
-                                iconName: "flag.fill"
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(viewModel.activeFilter == .green ? Color.green : Color.clear, lineWidth: 2.5)
-                            )
-                            .onTapGesture {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                                    if viewModel.activeFilter == .green {
-                                        viewModel.activeFilter = nil
-                                    } else {
-                                        viewModel.activeFilter = .green
-                                    }
-                                }
-                            }
-                            
-                            if viewModel.activeFilter == .green {
-                                let greenSwimmers = viewModel.sortedSwimmers.filter { $0.flagStatus == .greenFlag }
-                                VStack(alignment: .leading, spacing: 8) {
-                                    if greenSwimmers.isEmpty {
-                                        Text("No swimmers in this category")
-                                            .font(.system(size: 13, weight: .medium))
-                                            .foregroundColor(.secondary)
-                                            .padding(.horizontal)
-                                            .padding(.vertical, 4)
-                                    } else {
-                                         ForEach(greenSwimmers) { swimmer in
-                                             SwimmerRowView(swimmer: swimmer, viewModel: viewModel) { swimmer in
-                                                 self.selectedSwimmer = swimmer
-                                                 self.showResolutionDialog = true
-                                             }
-                                         }
-                                    }
-                                }
-                                .transition(.opacity.combined(with: .move(edge: .top)))
-                                .padding(.vertical, 4)
-                            }
-                        }
-                        
-                        // 4. Out of Water (Gray)
-                        VStack(alignment: .leading, spacing: 8) {
-                            AlertCard(
-                                title: "Out of Water",
-                                severity: .outOfWater,
-                                iconName: "person.fill"
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(viewModel.activeFilter == .outOfWater ? Color.gray : Color.clear, lineWidth: 2.5)
-                            )
-                            .onTapGesture {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                                    if viewModel.activeFilter == .outOfWater {
-                                        viewModel.activeFilter = nil
-                                    } else {
-                                        viewModel.activeFilter = .outOfWater
-                                    }
-                                }
-                            }
-                            
-                            if viewModel.activeFilter == .outOfWater {
-                                let outOfWaterSwimmers = viewModel.sortedSwimmers.filter { $0.flagStatus == .outOfWater }
-                                VStack(alignment: .leading, spacing: 8) {
-                                    if outOfWaterSwimmers.isEmpty {
-                                        Text("No swimmers in this category")
-                                            .font(.system(size: 13, weight: .medium))
-                                            .foregroundColor(.secondary)
-                                            .padding(.horizontal)
-                                            .padding(.vertical, 4)
-                                    } else {
-                                         ForEach(outOfWaterSwimmers) { swimmer in
-                                             SwimmerRowView(swimmer: swimmer, viewModel: viewModel) { swimmer in
-                                                 self.selectedSwimmer = swimmer
-                                                 self.showResolutionDialog = true
-                                             }
-                                         }
-                                    }
-                                }
-                                .transition(.opacity.combined(with: .move(edge: .top)))
-                                .padding(.vertical, 4)
-                            }
-                        }
+                        // 3. Beach Zone (Green indicator)
+                        zoneSection(title: "Beach Zone", zone: .beach)
                     }
                     .padding(.horizontal)
                 }
             }
             .padding(.vertical)
         }
-        .confirmationDialog("Dismiss Alert?", isPresented: $showResolutionDialog, titleVisibility: .visible) {
-            Button("False Alarm (Miss Alert)") {
-                if let swimmer = selectedSwimmer {
-                    viewModel.resolveAlert(for: swimmer, classification: "FALSE_ALARM")
+    }
+    
+    @ViewBuilder
+    private func zoneSection(title: String, zone: OperationalZone) -> some View {
+        let filterType = filterTypeForZone(zone)
+        let swimmers = viewModel.sortedSwimmers.filter { $0.zone == zone }
+        let isSelected = viewModel.activeFilter == filterType
+        
+        VStack(alignment: .leading, spacing: 8) {
+            ZoneHeaderCard(
+                title: title,
+                zone: zone,
+                count: swimmers.count,
+                isSelected: isSelected
+            )
+            .onTapGesture {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                    if viewModel.activeFilter == filterType {
+                        viewModel.activeFilter = nil
+                    } else {
+                        viewModel.activeFilter = filterType
+                    }
                 }
             }
-            Button("Real Emergency") {
-                if let swimmer = selectedSwimmer {
-                    viewModel.resolveAlert(for: swimmer, classification: "REAL_EMERGENCY")
+            
+            if viewModel.activeFilter == nil || isSelected {
+                VStack(alignment: .leading, spacing: 8) {
+                    if swimmers.isEmpty {
+                        Text("No swimmers in this zone")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal)
+                            .padding(.vertical, 4)
+                    } else {
+                        ForEach(swimmers) { swimmer in
+                            SwimmerRowView(swimmer: swimmer, viewModel: viewModel)
+                        }
+                    }
                 }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+                .padding(.vertical, 4)
             }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Please classify this warning before dismissing it.")
         }
+    }
+    
+    private func filterTypeForZone(_ zone: OperationalZone) -> SwimmerFilterType {
+        switch zone {
+        case .beach: return .beach
+        case .shallows: return .shallows
+        case .deepWater: return .deepWater
+        default: return .beach
+        }
+    }
+}
+
+struct ZoneHeaderCard: View {
+    let title: String
+    let zone: OperationalZone
+    let count: Int
+    let isSelected: Bool
+    
+    var body: some View {
+        HStack(spacing: 14) {
+            // Indicator badge
+            ZStack {
+                Circle()
+                    .fill(badgeBgColor)
+                    .frame(width: 32, height: 32)
+                
+                Circle()
+                    .fill(themeColor)
+                    .frame(width: 14, height: 14)
+                    .shadow(color: themeColor, radius: 4)
+            }
+            
+            Text(title)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(.white)
+            
+            Spacer()
+            
+            // Numeric Swimmer Count
+            Text("\(count)")
+                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                .foregroundColor(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(Color.white.opacity(0.12))
+                .clipShape(Capsule())
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(cardBgColor)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(isSelected ? themeColor : Color.white.opacity(0.1), lineWidth: isSelected ? 2 : 1)
+        )
+        .shadow(color: isSelected ? themeColor.opacity(0.15) : Color.clear, radius: 6, x: 0, y: 3)
+    }
+    
+    private var themeColor: Color {
+        switch zone {
+        case .beach: return Color.green
+        case .shallows: return Color.yellow
+        case .deepWater: return Color.red
+        default: return Color.gray
+        }
+    }
+    
+    private var badgeBgColor: Color {
+        themeColor.opacity(0.15)
+    }
+    
+    private var cardBgColor: Color {
+        Color(UIColor.secondarySystemBackground)
     }
 }
 
 struct SwimmerRowView: View {
     let swimmer: Swimmer
     @ObservedObject var viewModel: SwimmerViewModel
-    let onCancelAlert: (Swimmer) -> Void
     
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text("Swimmer \(swimmer.id.prefix(4))")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.primary)
-                    Spacer()
-                    if swimmer.flagStatus == .redFlag || swimmer.flagStatus == .yellowFlag {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(swimmer.flagStatus == .redFlag ? .red : .yellow)
-                            .font(.system(size: 14))
-                    } else if swimmer.flagStatus == .outOfWater {
-                        Text("מחוץ למים")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.green)
-                            .cornerRadius(4)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Swimmer \(swimmer.id.prefix(6))")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.primary)
+                        Spacer()
+                        if swimmer.alertLevel != .none {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(swimmer.alertLevel == .red ? .red : .yellow)
+                                .font(.system(size: 14))
+                        }
                     }
-                }
-                
-                HStack(spacing: 12) {
-                    Text("HR: \(swimmer.heartRate)")
-                        .foregroundColor(swimmer.heartRate > 120 || swimmer.heartRate < 50 ? .red : .secondary)
-                    Text("SpO2: \(swimmer.spo2)%")
-                        .foregroundColor(swimmer.spo2 < 95 ? .red : .secondary)
-                    if swimmer.flagStatus != .outOfWater {
+                    
+                    HStack(spacing: 12) {
+                        Text("HR: \(swimmer.heartRate)")
+                            .foregroundColor(swimmer.heartRate > 120 || swimmer.heartRate < 50 ? .red : .secondary)
+                        Text("SpO2: \(swimmer.spo2)%")
+                            .foregroundColor(swimmer.spo2 < 95 ? .red : .secondary)
                         Text("Depth: \(String(format: "%.1f", swimmer.depthMeters))m")
                             .foregroundColor(.secondary)
-                    } else {
-                        Text("On Shore")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.green)
                     }
+                    .font(.system(size: 12))
                 }
-                .font(.system(size: 12))
-            }
-            .padding(10)
-            .background(Color(UIColor.secondarySystemBackground).opacity(0.8))
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.primary.opacity(0.04), lineWidth: 1)
-            )
-            
-            // Locate Button
-            Button(action: {
-                if let coord = swimmer.coordinate {
-                    viewModel.mapFocusCoordinate = FocusCoordinate(latitude: coord.latitude, longitude: coord.longitude)
-                }
-            }) {
-                Image(systemName: "mappin.circle.fill")
-                    .font(.system(size: 26))
-                    .foregroundColor(.blue)
-            }
-            .buttonStyle(.plain)
-            
-            // Cancel Alert Button
-            if swimmer.flagStatus == .redFlag || swimmer.flagStatus == .yellowFlag {
+                
+                Spacer()
+                
+                // Locate Button
                 Button(action: {
-                    onCancelAlert(swimmer)
+                    withAnimation(.easeInOut(duration: 1.0)) {
+                        viewModel.selectedSwimmerId = swimmer.id
+                        if let coord = swimmer.coordinate {
+                            viewModel.mapFocusCoordinate = FocusCoordinate(latitude: coord.latitude, longitude: coord.longitude)
+                        }
+                    }
                 }) {
-                    Image(systemName: "xmark.circle.fill")
+                    Image(systemName: "mappin.circle.fill")
                         .font(.system(size: 26))
-                        .foregroundColor(.red)
+                        .foregroundColor(.blue)
                 }
                 .buttonStyle(.plain)
+            }
+            
+            // Acknowledgment Buttons (Directly inside Sidebar Row)
+            if swimmer.alertLevel != .none {
+                HStack(spacing: 8) {
+                    Button(action: {
+                        withAnimation(.spring()) {
+                            viewModel.resolveAlert(for: swimmer, classification: "REAL_EMERGENCY")
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "lifepreserver.fill")
+                            Text("True Alarm")
+                        }
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(Color.red)
+                        .cornerRadius(8)
+                        .shadow(color: Color.red.opacity(0.3), radius: 3)
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Button(action: {
+                        withAnimation(.spring()) {
+                            viewModel.resolveAlert(for: swimmer, classification: "FALSE_ALARM")
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "bell.slash.fill")
+                            Text("False Alarm")
+                        }
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(Color.gray.opacity(0.6))
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.top, 4)
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(viewModel.selectedSwimmerId == swimmer.id ? Color.blue.opacity(0.15) : Color(UIColor.secondarySystemBackground).opacity(0.8))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(viewModel.selectedSwimmerId == swimmer.id ? Color.blue.opacity(0.5) : Color.primary.opacity(0.04), lineWidth: 1)
+        )
+        .onTapGesture {
+            withAnimation(.spring()) {
+                if viewModel.selectedSwimmerId == swimmer.id {
+                    viewModel.selectedSwimmerId = nil
+                } else {
+                    viewModel.selectedSwimmerId = swimmer.id
+                    if let coord = swimmer.coordinate {
+                        viewModel.mapFocusCoordinate = FocusCoordinate(latitude: coord.latitude, longitude: coord.longitude)
+                    }
+                }
             }
         }
     }

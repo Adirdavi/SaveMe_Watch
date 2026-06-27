@@ -21,6 +21,7 @@ class FirebaseManager {
     }
     
     private func listenToAllDevices() {
+        print("🔌 [FirebaseManager] Initializing real-time listener for 'devices' node.")
         dbRef.child("devices").observe(.value) { [weak self] snapshot in
             guard let self = self else { return }
             
@@ -77,8 +78,8 @@ class FirebaseManager {
                 
                 // --- 2. משיכת הנתונים מ-active_warnings ---
                 let warningsSnap = deviceSnapshot.childSnapshot(forPath: "active_warnings")
-                if let latestWarning = warningsSnap.children.allObjects.last as? DataSnapshot,
-                   let warningDict = latestWarning.value as? [String: Any] {
+                if let warningDict = warningsSnap.value as? [String: Any] {
+                    print("🚨 [FirebaseManager] Fetched active warning for device \(deviceId): \(warningDict)")
                     
                     if let severityRaw = warningDict["severity"] as? String,
                        let level = AlertLevel(rawValue: severityRaw) {
@@ -145,5 +146,36 @@ class FirebaseManager {
             "classification": classification
         ]
         dbRef.child("devices").child(deviceId).child("resolved_history").childByAutoId().setValue(resolutionData)
+    }
+    
+    // MARK: - Custom Zone Boundaries
+    
+    /// Saves custom zone boundary coordinates to Firebase under the user's profile.
+    func saveCustomZones(userId: String, zones: [String: [[Double]]]) async throws {
+        try await dbRef.child("users").child(userId).child("custom_zones").setValue(zones)
+    }
+    
+    /// Loads custom zone boundary coordinates from Firebase. Returns nil if no data exists.
+    func loadCustomZones(userId: String) async throws -> [String: [[Double]]]? {
+        let snapshot = try await dbRef.child("users").child(userId).child("custom_zones").getData()
+        
+        guard snapshot.exists(), let dict = snapshot.value as? [String: Any] else {
+            return nil
+        }
+        
+        var result: [String: [[Double]]] = [:]
+        for (key, value) in dict {
+            if let coordArrays = value as? [[Any]] {
+                let parsed: [[Double]] = coordArrays.compactMap { arr in
+                    guard arr.count == 2,
+                          let lat = arr[0] as? Double,
+                          let lon = arr[1] as? Double else { return nil }
+                    return [lat, lon]
+                }
+                result[key] = parsed
+            }
+        }
+        
+        return result.isEmpty ? nil : result
     }
 }

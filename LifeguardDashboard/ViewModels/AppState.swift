@@ -60,6 +60,11 @@ class AppState: ObservableObject {
             // 3. Set local state
             self.currentUser = UserProfile(username: username, arbourLatitude: latitude, arbourLongitude: longitude, arbourName: arbourName)
             self.isAuthenticated = true
+            
+            // Save fallback credentials for persistent login (Keychain simulator workaround)
+            UserDefaults.standard.set(username, forKey: "saved_username")
+            UserDefaults.standard.set(password, forKey: "saved_password")
+            
             print("✅ Sign Up succeeded for UID: \(uid)")
         } catch {
             print("❌ Firebase Sign Up Error: \(error.localizedDescription)")
@@ -86,6 +91,11 @@ class AppState: ObservableObject {
             
             // 2. Retrieve Profile from Firebase Database
             await fetchUserProfile(uid: uid)
+            
+            // Save fallback credentials for persistent login (Keychain simulator workaround)
+            UserDefaults.standard.set(username, forKey: "saved_username")
+            UserDefaults.standard.set(password, forKey: "saved_password")
+            
             print("✅ Sign In succeeded for UID: \(uid)")
         } catch {
             print("❌ Firebase Sign In Error: \(error.localizedDescription)")
@@ -101,6 +111,11 @@ class AppState: ObservableObject {
     func logout() {
         do {
             try Auth.auth().signOut()
+            
+            // Clear fallback credentials on logout
+            UserDefaults.standard.removeObject(forKey: "saved_username")
+            UserDefaults.standard.removeObject(forKey: "saved_password")
+            
             self.currentUser = nil
             self.isAuthenticated = false
             print("✅ User logged out successfully.")
@@ -113,13 +128,27 @@ class AppState: ObservableObject {
     
     /// Re-authenticates the user automatically if a secure JWT is present in the Keychain on startup.
     func restoreSession() async {
-        guard let user = Auth.auth().currentUser else {
+        if let user = Auth.auth().currentUser {
+            isLoading = true
+            await fetchUserProfile(uid: user.uid)
+            isLoading = false
             return
         }
         
-        isLoading = true
-        await fetchUserProfile(uid: user.uid)
-        isLoading = false
+        // Keychain fallback: Auto-login with saved credentials if Firebase Auth state was lost
+        if let savedUsername = UserDefaults.standard.string(forKey: "saved_username"),
+           let savedPassword = UserDefaults.standard.string(forKey: "saved_password") {
+            isLoading = true
+            let email = emailFor(username: savedUsername)
+            do {
+                let authResult = try await Auth.auth().signIn(withEmail: email, password: savedPassword)
+                await fetchUserProfile(uid: authResult.user.uid)
+                print("🔑 [AppState] Persistent session restored via saved credentials fallback.")
+            } catch {
+                print("⚠️ [AppState] Saved credentials auto-login fallback failed: \(error.localizedDescription)")
+            }
+            isLoading = false
+        }
     }
     
     /// Helper to fetch user profile data from Realtime Database

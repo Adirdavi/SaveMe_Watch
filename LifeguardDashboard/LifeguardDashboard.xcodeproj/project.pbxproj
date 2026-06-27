@@ -23,6 +23,8 @@
 		B90DA0B32FB710EC006B5C2A /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90DA0A32FB710EC006B5C2A /* AppState.swift */; };
 		B90DA0B42FB710EC006B5C2A /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90DA0A42FB710EC006B5C2A /* AuthView.swift */; };
 		B90DA0B52FB710EC006B5C2A /* RootContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90DA0A52FB710EC006B5C2A /* RootContentView.swift */; };
+		B90DA0C02FB71800006B5C2A /* ZoneBoundaryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90DA0BF2FB71800006B5C2A /* ZoneBoundaryManager.swift */; };
+		B90DA0C22FB71900006B5C2A /* AlertPopupOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = B90DA0C12FB71900006B5C2A /* AlertPopupOverlay.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -59,6 +61,8 @@
 		B90DA0A32FB710EC006B5C2A /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		B90DA0A42FB710EC006B5C2A /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
 		B90DA0A52FB710EC006B5C2A /* RootContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootContentView.swift; sourceTree = "<group>"; };
+		B90DA0BF2FB71800006B5C2A /* ZoneBoundaryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoneBoundaryManager.swift; sourceTree = "<group>"; };
+		B90DA0C12FB71900006B5C2A /* AlertPopupOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertPopupOverlay.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -138,6 +142,7 @@
 			children = (
 				B90DA07A2FB710EC006B5C2A /* Swimmer.swift */,
 				B90DA0A02FB710EC006B5C2A /* UserProfile.swift */,
+				B90DA0BF2FB71800006B5C2A /* ZoneBoundaryManager.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -169,6 +174,7 @@
 				B90DA0842FB710EC006B5C2A /* SidebarView.swift */,
 				B90DA0A42FB710EC006B5C2A /* AuthView.swift */,
 				B90DA0A52FB710EC006B5C2A /* RootContentView.swift */,
+				B90DA0C12FB71900006B5C2A /* AlertPopupOverlay.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -343,6 +349,8 @@
 				B90DA0B32FB710EC006B5C2A /* AppState.swift in Sources */,
 				B90DA0B42FB710EC006B5C2A /* AuthView.swift in Sources */,
 				B90DA0B52FB710EC006B5C2A /* RootContentView.swift in Sources */,
+				B90DA0C02FB71800006B5C2A /* ZoneBoundaryManager.swift in Sources */,
+				B90DA0C22FB71900006B5C2A /* AlertPopupOverlay.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

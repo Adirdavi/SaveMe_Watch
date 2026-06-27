@@ -35,13 +35,16 @@ struct Swimmer: Identifiable, Equatable {
     var zone: OperationalZone = .outOfBounds
     
     var flagStatus: SwimmerFlagStatus {
-        if !isSubmerged {
-            return .outOfWater
-        }
         switch alertLevel {
-        case .red: return .redFlag
-        case .yellow: return .yellowFlag
-        case .none: return .greenFlag
+        case .red:
+            return .redFlag
+        case .yellow:
+            return .yellowFlag
+        case .none:
+            if !isSubmerged {
+                return .outOfWater
+            }
+            return .greenFlag
         }
     }
     

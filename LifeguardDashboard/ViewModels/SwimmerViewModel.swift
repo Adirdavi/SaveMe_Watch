@@ -1,4 +1,4 @@
-import Foundation
+  import Foundation
 import Combine
 import CoreLocation
 import SwiftUI
@@ -20,12 +20,18 @@ class SwimmerViewModel: ObservableObject {
     @Published var selectedStation: LifeguardStation? = nil
     @Published var activeFilter: SwimmerFilterType? = nil
     @Published var mapFocusCoordinate: FocusCoordinate? = nil
+    @Published var selectedSwimmerId: String? = nil
+    
+    // MARK: - Zone Boundary Manager
+    @Published var zoneBoundaryManager = ZoneBoundaryManager()
     
     // MARK: - Simulation Mode
     @Published var isSimulationModeEnabled: Bool = false {
         didSet {
             if isSimulationModeEnabled {
-                spawnMockSwimmers()
+                if mockSwimmers.isEmpty {
+                    spawnMockSwimmers()
+                }
                 generateGhostAnnotations()
             } else {
                 cleanupSimulation()
@@ -38,6 +44,7 @@ class SwimmerViewModel: ObservableObject {
     
     @Published var currentUser: UserProfile? = nil {
         didSet {
+            generateGhostAnnotations()
             processSwimmers(self.rawSwimmers)
         }
     }
@@ -46,7 +53,59 @@ class SwimmerViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var rawSwimmers: [Swimmer] = []
     
+    private var lastGhostGenerationTime: Date = .distantPast
+    private var ghostPositions: [String: CLLocationCoordinate2D] = [:]
+    
     var tacticalZones: [TacticalZone] {
+        guard let _ = currentUser else { return [] }
+        
+        // Use custom zones if the user has drawn and saved them
+        if zoneBoundaryManager.hasCustomZones {
+            return customTacticalZones
+        }
+        
+        return defaultTacticalZones
+    }
+    
+    /// Builds TacticalZone array from the user's custom polygon vertices.
+    private var customTacticalZones: [TacticalZone] {
+        var zones: [TacticalZone] = []
+        
+        let beachVerts = zoneBoundaryManager.beachVertices
+        if beachVerts.count >= 3 {
+            zones.append(TacticalZone(
+                name: "Zone 1 (Beach)",
+                coordinates: beachVerts,
+                fillColor: Color.green.opacity(0.2),
+                strokeColor: Color.green
+            ))
+        }
+        
+        let shallowsVerts = zoneBoundaryManager.shallowsVertices
+        if shallowsVerts.count >= 3 {
+            zones.append(TacticalZone(
+                name: "Zone 2 (Shallows)",
+                coordinates: shallowsVerts,
+                fillColor: Color.yellow.opacity(0.2),
+                strokeColor: Color.yellow
+            ))
+        }
+        
+        let deepVerts = zoneBoundaryManager.deepVertices
+        if deepVerts.count >= 3 {
+            zones.append(TacticalZone(
+                name: "Zone 3 (Deep Water)",
+                coordinates: deepVerts,
+                fillColor: Color.red.opacity(0.2),
+                strokeColor: Color.red
+            ))
+        }
+        
+        return zones
+    }
+    
+    /// The original auto-generated tactical zone polygons based on arbour position.
+    private var defaultTacticalZones: [TacticalZone] {
         guard let user = currentUser else { return [] }
         
         let latOffset = 0.0003
@@ -118,6 +177,7 @@ class SwimmerViewModel: ObservableObject {
             .sink { [weak self] swimmersDict in
                 let arr = Array(swimmersDict.values)
                 self?.rawSwimmers = arr
+                self?.generateGhostAnnotations()
                 self?.processSwimmers(arr)
             }
             .store(in: &cancellables)
@@ -143,9 +203,38 @@ class SwimmerViewModel: ObservableObject {
                 self?.objectWillChange.send()
             }
             .store(in: &cancellables)
+        
+        // Re-process swimmers when custom zone boundaries change
+        zoneBoundaryManager.$hasCustomZones
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                self.generateGhostAnnotations()
+                self.processSwimmers(self.rawSwimmers)
+            }
+            .store(in: &cancellables)
+        
+        // Forward ALL ZoneBoundaryManager changes to trigger SwiftUI view updates
+        // (needed because nested ObservableObjects don't auto-propagate to parent observers)
+        zoneBoundaryManager.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
     }
     
     func determineZone(for coordinate: CLLocationCoordinate2D) -> OperationalZone {
+        // Use custom polygon-based detection when custom zones exist
+        if zoneBoundaryManager.hasCustomZones {
+            return zoneBoundaryManager.determineCustomZone(for: coordinate)
+        }
+        
+        return determineZoneDefault(for: coordinate)
+    }
+    
+    /// The original interpolation-based zone detection using auto-generated boundaries.
+    private func determineZoneDefault(for coordinate: CLLocationCoordinate2D) -> OperationalZone {
         guard let user = currentUser else { return .outOfBounds }
         
         let lat = coordinate.latitude
@@ -188,27 +277,35 @@ class SwimmerViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Custom Zone Loading
+    
+    /// Loads custom zone boundaries from Firebase for the current authenticated user.
+    func loadCustomZones() {
+        Task {
+            await zoneBoundaryManager.loadFromFirebase()
+        }
+    }
+    
     private func processSwimmers(_ swimmers: [Swimmer]) {
         var filteredSwimmers = swimmers
         
-        // Only consider swimmers within the active arbour's tactical polygon
+        // Only consider swimmers and map their calculated zone
         if let _ = currentUser {
             filteredSwimmers = swimmers.compactMap { swimmer in
                 guard let coord = swimmer.coordinate else { return nil }
                 let calculatedZone = self.determineZone(for: coord)
-                if calculatedZone == .outOfBounds {
-                    return nil
-                }
                 var updatedSwimmer = swimmer
                 updatedSwimmer.zone = calculatedZone
                 return updatedSwimmer
             }
         }
         
-        // Merge mock swimmers and ghost annotations when simulation is active
+        // Always include ghost annotations of real swimmers (shown twice on the map!)
+        filteredSwimmers.append(contentsOf: ghostSwimmers)
+        
+        // Merge mock swimmers when simulation is active
         if isSimulationModeEnabled {
             filteredSwimmers.append(contentsOf: mockSwimmers)
-            filteredSwimmers.append(contentsOf: ghostSwimmers)
         }
         
         self.sortedSwimmers = filteredSwimmers.sorted {
@@ -230,18 +327,17 @@ class SwimmerViewModel: ObservableObject {
                 self.activeYellowAlert = false
                 AudioService.shared.playRedAlarm()
             }
-        } else {
+        } else if hasYellowAlert {
             self.activeRedAlert = false
-            if hasYellowAlert {
-                if !self.activeYellowAlert {
-                    self.activeYellowAlert = true
-                    AudioService.shared.playYellowAlarm()
-                }
-            } else {
-                if self.activeYellowAlert {
-                    self.activeYellowAlert = false
-                    AudioService.shared.stopAlarm()
-                }
+            if !self.activeYellowAlert {
+                self.activeYellowAlert = true
+                AudioService.shared.playYellowAlarm()
+            }
+        } else {
+            if self.activeRedAlert || self.activeYellowAlert {
+                self.activeRedAlert = false
+                self.activeYellowAlert = false
+                AudioService.shared.stopAlarm()
             }
         }
     }
@@ -260,7 +356,18 @@ class SwimmerViewModel: ObservableObject {
     }
     
     func resolveAlert(for swimmer: Swimmer, classification: String) {
-        FirebaseManager.shared.resolveAlert(deviceId: swimmer.id, classification: classification)
+        if swimmer.id.hasPrefix("SIM-") {
+            if let index = mockSwimmers.firstIndex(where: { $0.id == swimmer.id }) {
+                mockSwimmers[index].alertLevel = .none
+                mockSwimmers[index].alertReason = nil
+                processSwimmers(self.rawSwimmers)
+            }
+        } else if swimmer.id.hasPrefix("GHOST-") {
+            let realId = String(swimmer.id.dropFirst("GHOST-".count))
+            FirebaseManager.shared.resolveAlert(deviceId: realId, classification: classification)
+        } else {
+            FirebaseManager.shared.resolveAlert(deviceId: swimmer.id, classification: classification)
+        }
     }
     
     func selectClosestStation() {
@@ -283,14 +390,12 @@ class SwimmerViewModel: ObservableObject {
     func isSwimmerMatchingFilter(_ swimmer: Swimmer) -> Bool {
         guard let filter = activeFilter else { return true }
         switch filter {
-        case .red:
-            return swimmer.flagStatus == .redFlag
-        case .yellow:
-            return swimmer.flagStatus == .yellowFlag
-        case .green:
-            return swimmer.flagStatus == .greenFlag
-        case .outOfWater:
-            return swimmer.flagStatus == .outOfWater
+        case .beach:
+            return swimmer.zone == .beach
+        case .shallows:
+            return swimmer.zone == .shallows
+        case .deepWater:
+            return swimmer.zone == .deepWater
         }
     }
     
@@ -326,41 +431,140 @@ class SwimmerViewModel: ObservableObject {
         return CLLocationCoordinate2D(latitude: randomLat, longitude: randomLon)
     }
     
-    /// Spawns 4 mock swimmers with healthy vitals at random positions inside the tactical zones.
-    func spawnMockSwimmers() {
+    /// Spawns mock swimmers with specific alert levels.
+    func spawnMockSwimmers(withAlertLevels alertLevels: [AlertLevel]) {
         guard currentUser != nil else { return }
         
         var mocks: [Swimmer] = []
-        for i in 1...4 {
+        for (index, level) in alertLevels.enumerated() {
+            let id = "SIM-\(index + 1)"
             let coord = randomCoordinateInTacticalZones()
-            var swimmer = Swimmer(id: "SIM-\(i)")
+            var swimmer = Swimmer(id: id)
             swimmer.heartRate = Int.random(in: 100...120)
             swimmer.spo2 = Int.random(in: 96...99)
             swimmer.depthMeters = Double.random(in: 0.3...2.5)
             swimmer.isSubmerged = true
             swimmer.coordinate = coord
             swimmer.zone = determineZone(for: coord)
-            swimmer.alertLevel = .none
+            swimmer.alertLevel = level
+            
+            // Adjust metrics to fit the alert severity
+            switch level {
+            case .none:
+                break // Already healthy
+            case .yellow:
+                swimmer.heartRate = Int.random(in: 125...140)
+                swimmer.spo2 = Int.random(in: 90...94)
+                swimmer.alertReason = "Simulated: Elevated HR / Low SpO2"
+            case .red:
+                swimmer.heartRate = Int.random(in: 30...45)
+                swimmer.spo2 = Int.random(in: 78...86)
+                swimmer.depthMeters = Double.random(in: 3.0...5.0)
+                swimmer.alertReason = "Simulated: Critical vitals"
+            }
             mocks.append(swimmer)
         }
         self.mockSwimmers = mocks
     }
     
+    /// Spawns 4 mock swimmers with healthy vitals at random positions inside the tactical zones.
+    func spawnMockSwimmers() {
+        spawnMockSwimmers(withAlertLevels: [.none, .none, .none, .none])
+    }
+    
+    /// Helper to generate a random coordinate inside the default Yellow/Red tactical zones.
+    private func randomCoordinateInDefaultYellowOrRed() -> CLLocationCoordinate2D {
+        guard let user = currentUser else { return CLLocationCoordinate2D(latitude: 0, longitude: 0) }
+        let latOffset = 0.0003
+        let minLat = user.arbourLatitude - latOffset
+        let maxLat = user.arbourLatitude + latOffset
+        
+        let arbourLon = user.arbourLongitude
+        let zone1Base = arbourLon - 0.0008
+        let zone3Base = arbourLon - 0.0020
+        let coastSkew = 0.0004
+        
+        let randomLat = Double.random(in: minLat...maxLat)
+        let t = (randomLat - minLat) / (maxLat - minLat)
+        let skewFactor = coastSkew * (2.0 * t - 1.0)
+        let effectiveZone1Lon = zone1Base + skewFactor
+        let effectiveZone3Lon = zone3Base + skewFactor
+        
+        let randomLon = Double.random(in: effectiveZone3Lon...effectiveZone1Lon)
+        return CLLocationCoordinate2D(latitude: randomLat, longitude: randomLon)
+    }
+    
+    /// Helper to generate a random coordinate inside the custom Yellow/Red tactical zones.
+    private func randomCoordinateInCustomYellowOrRed() -> CLLocationCoordinate2D {
+        var availablePolygons: [[CLLocationCoordinate2D]] = []
+        if zoneBoundaryManager.shallowsVertices.count >= 3 {
+            availablePolygons.append(zoneBoundaryManager.shallowsVertices)
+        }
+        if zoneBoundaryManager.deepVertices.count >= 3 {
+            availablePolygons.append(zoneBoundaryManager.deepVertices)
+        }
+        
+        guard !availablePolygons.isEmpty else {
+            return randomCoordinateInDefaultYellowOrRed()
+        }
+        
+        let vertices = availablePolygons.randomElement()!
+        
+        let lats = vertices.map { $0.latitude }
+        let lons = vertices.map { $0.longitude }
+        guard let minLat = lats.min(), let maxLat = lats.max(),
+              let minLon = lons.min(), let maxLon = lons.max() else {
+            return randomCoordinateInDefaultYellowOrRed()
+        }
+        
+        for _ in 0..<100 {
+            let candidate = CLLocationCoordinate2D(
+                latitude: Double.random(in: minLat...maxLat),
+                longitude: Double.random(in: minLon...maxLon)
+            )
+            if zoneBoundaryManager.containsPoint(candidate, inPolygon: vertices) {
+                return candidate
+            }
+        }
+        
+        return vertices.randomElement() ?? randomCoordinateInDefaultYellowOrRed()
+    }
+
     /// Generates ghost annotations for any currently connected real Firebase devices.
     func generateGhostAnnotations() {
         guard currentUser != nil else { return }
         
+        let now = Date()
+        let shouldRegenerate = now.timeIntervalSince(lastGhostGenerationTime) >= 30.0
+        
+        if shouldRegenerate {
+            lastGhostGenerationTime = now
+        }
+        
         self.ghostSwimmers = rawSwimmers.compactMap { realSwimmer in
             guard realSwimmer.coordinate != nil else { return nil }
-            let ghostCoord = randomCoordinateInTacticalZones()
-            var ghost = Swimmer(id: "GHOST-\(realSwimmer.id)")
+            
+            let ghostId = "GHOST-\(realSwimmer.id)"
+            
+            // Get or generate coordinate strictly in Yellow or Red zones
+            let ghostCoord: CLLocationCoordinate2D
+            if shouldRegenerate || ghostPositions[ghostId] == nil {
+                let newCoord = zoneBoundaryManager.hasCustomZones ? randomCoordinateInCustomYellowOrRed() : randomCoordinateInDefaultYellowOrRed()
+                ghostPositions[ghostId] = newCoord
+                ghostCoord = newCoord
+            } else {
+                ghostCoord = ghostPositions[ghostId]!
+            }
+            
+            var ghost = Swimmer(id: ghostId)
             ghost.heartRate = realSwimmer.heartRate
             ghost.spo2 = realSwimmer.spo2
-            ghost.depthMeters = Double.random(in: 0.5...3.0)
-            ghost.isSubmerged = true
+            ghost.depthMeters = realSwimmer.depthMeters
+            ghost.isSubmerged = realSwimmer.isSubmerged
             ghost.coordinate = ghostCoord
             ghost.zone = determineZone(for: ghostCoord)
-            ghost.alertLevel = .none
+            ghost.alertLevel = realSwimmer.alertLevel
+            ghost.alertReason = realSwimmer.alertReason
             return ghost
         }
     }
@@ -409,18 +613,18 @@ class SwimmerViewModel: ObservableObject {
     }
     
     /// Removes all mock swimmers, ghost annotations, and resets alert state.
+    /// Removes all mock swimmers, resets alert state, and keeps ghost annotations for active real watches.
     func cleanupSimulation() {
         mockSwimmers.removeAll()
-        ghostSwimmers.removeAll()
+        generateGhostAnnotations()
         AudioService.shared.stopAlarm()
     }
 }
 
 enum SwimmerFilterType: String {
-    case red
-    case yellow
-    case green
-    case outOfWater
+    case beach
+    case shallows
+    case deepWater
 }
 
 struct FocusCoordinate: Equatable {

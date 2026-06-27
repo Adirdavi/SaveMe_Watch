@@ -8,7 +8,7 @@ struct MainSplitView: View {
     var body: some View {
         HStack(spacing: 0) {
             // Map on the Left
-            MapView(viewModel: viewModel, isSidebarVisible: $isSidebarVisible)
+            MapView(viewModel: viewModel, zoneBoundaryManager: viewModel.zoneBoundaryManager, isSidebarVisible: $isSidebarVisible)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             
             if isSidebarVisible {
@@ -25,9 +25,11 @@ struct MainSplitView: View {
         .ignoresSafeArea(.all, edges: .bottom)
         .onAppear {
             viewModel.currentUser = appState.currentUser
+            viewModel.loadCustomZones()
         }
         .onChange(of: appState.currentUser) { _, newUser in
             viewModel.currentUser = newUser
+            viewModel.loadCustomZones()
         }
     }
 }
